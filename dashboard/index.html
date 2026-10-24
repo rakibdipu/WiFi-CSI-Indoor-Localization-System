@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wi-Fi CSI Indoor Human Localization & Tracking Digital Twin</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        canvas#roomCanvas { background: #020617; border-radius: 0.75rem; }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 glass-card p-6 rounded-2xl shadow-xl">
+            <div>
+                <div class="flex items-center gap-3">
+                    <span class="p-2 bg-indigo-500/20 text-indigo-400 rounded-lg"><i data-lucide="radio"></i></span>
+                    <h1 class="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-cyan-300 to-emerald-400">
+                        Wi-Fi CSI Device-Free Human Localization & Digital Twin
+                    </h1>
+                </div>
+                <p class="text-sm text-slate-400 mt-1">
+                    Camera-Free • Device-Free • ESP32-S3 Channel State Information • Subcarrier Multipath Sensing
+                </p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="connStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="connStatusText">Connected</span>
+                </div>
+                <div class="text-xs text-slate-400 px-3 py-1.5 glass-card rounded-xl">
+                    Rate: <span id="valPktRate" class="font-mono text-cyan-300 font-bold">100</span> pkts/s
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left 2 Cols: 2D Room Map & Digital Twin -->
+            <div class="lg:col-span-2 glass-card p-6 rounded-2xl shadow-xl space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="map" class="w-5 h-5 text-indigo-400"></i>
+                        <h2 class="text-lg font-semibold">2D Room Digital Twin Map (5.0m × 6.0m)</h2>
+                    </div>
+                    <div class="text-xs text-slate-400 flex items-center gap-4">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> AP (Phone)</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-indigo-400"></span> ESP32-S3 RX</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> Human Target</span>
+                    </div>
+                </div>
+
+                <!-- Canvas Container -->
+                <div class="relative w-full aspect-[5/6] max-h-[520px] mx-auto flex items-center justify-center">
+                    <canvas id="roomCanvas" width="500" height="600" class="w-full h-full border border-slate-700/50 shadow-inner"></canvas>
+                </div>
+            </div>
+
+            <!-- Right Col: Live Metrics & States -->
+            <div class="space-y-6">
+                <!-- Presence & Activity Status Card -->
+                <div class="glass-card p-6 rounded-2xl shadow-xl space-y-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="user-check" class="w-5 h-5 text-cyan-400"></i>
+                        <h2 class="text-lg font-semibold">Live State & Sensing</h2>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Presence</span>
+                            <div id="valPresence" class="text-lg font-bold text-emerald-400 mt-1">Occupied</div>
+                        </div>
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Activity</span>
+                            <div id="valActivity" class="text-lg font-bold text-cyan-300 mt-1">Walking</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Estimated (X, Y)</span>
+                            <div id="valCoords" class="text-lg font-mono font-bold text-indigo-300 mt-1">(2.45, 3.12) m</div>
+                        </div>
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Room Zone</span>
+                            <div id="valZone" class="text-lg font-bold text-amber-300 mt-1">Zone-A1</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Direction</span>
+                            <div id="valDirection" class="text-lg font-bold text-violet-300 mt-1">North</div>
+                        </div>
+                        <div class="p-3.5 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-xs text-slate-400 uppercase font-medium">Confidence</span>
+                            <div id="valConfidence" class="text-lg font-mono font-bold text-emerald-300 mt-1">87%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RF Channel Telemetry -->
+                <div class="glass-card p-6 rounded-2xl shadow-xl space-y-4">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="activity" class="w-5 h-5 text-indigo-400"></i>
+                        <h2 class="text-lg font-semibold">RF Signal Telemetry</h2>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="flex justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-slate-400">RSSI:</span>
+                            <span id="valRssi" class="font-mono text-cyan-400 font-bold">-56 dBm</span>
+                        </div>
+                        <div class="flex justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+                            <span class="text-slate-400">Noise:</span>
+                            <span id="valNoise" class="font-mono text-slate-300 font-bold">-92 dBm</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom: Real-Time CSI Subcarrier Waveform Spectrum -->
+        <div class="glass-card p-6 rounded-2xl shadow-xl space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="waves" class="w-5 h-5 text-cyan-400"></i>
+                    <h2 class="text-lg font-semibold">Real-Time CSI Subcarrier Amplitude Spectrum (|H(k)|)</h2>
+                </div>
+                <span class="text-xs text-slate-400">HT-LTF 20MHz (56 Subcarrier Channels)</span>
+            </div>
+            <div class="h-48 w-full">
+                <canvas id="csiChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script src="/static/app.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
